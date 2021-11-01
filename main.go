@@ -7,6 +7,16 @@ import (
 	"redisData/dao/redis"
 )
 
+var symbol = make([]string, 0)
+
+//  QueryKlineData 每隔30s发送一次请求，请求全部类型的交易对
+//  如果没有key就创建，存在key就更新
+
+func QueryKlineData() {
+	response, err := http.Get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt")
+
+}
+
 func main() {
 	//初始化redis
 	err := redis.InitClient()

@@ -1,0 +1,14 @@
+version: V1.0.0
+name: "redisData"
+mode: "dev"
+port: 8887
+url: https://api.huobi.pro/market/history
+start_time: "2021-11-01"
+machine_id: 1
+
+redis:
+  host: "127.0.0.1"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 100

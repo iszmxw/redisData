@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"redisData/logic"
 	"redisData/utils"
+	"strconv"
 	"time"
 )
 
@@ -28,14 +29,12 @@ var upGrader = websocket.Upgrader{
 //}
 
 func GetRedisData(c *gin.Context) {
-
 	//升级get请求为webSocket协议
 	ws, err := upGrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 	defer ws.Close() //返回前关闭
-
 	for {
 		//读取ws中的数据
 		mt, message, err := ws.ReadMessage()
@@ -44,14 +43,13 @@ func GetRedisData(c *gin.Context) {
 		}
 		//自定义修改 1.获取参数 2.调用逻辑 3.返回数据
 		data, err := logic.GetDataByKey(string(message))
-
 		websocketData := utils.Strval(data)
 		//时间参数
-		//var t D
-		//times := c.Param("times")
-		//t, err := strconv.Atoi(times)
+		times := c.Param("times")
+		t, err := strconv.Atoi(times)
+		tt := int64(t)
+		n := utils.GetSleepTime(tt)
 		if err != nil {
-
 			fmt.Printf("字符串转换int类型失败,err is %v", err)
 		}
 		//写入ws数据
@@ -61,7 +59,7 @@ func GetRedisData(c *gin.Context) {
 				if err != nil {
 					return
 				}
-				time.Sleep(time.Second * 1)
+				time.Sleep(time.Second * n)
 			}
 
 		}()

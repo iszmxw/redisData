@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"strconv"
+	"time"
 )
 
 func Strval(value interface{}) string {
@@ -58,4 +59,8 @@ func Strval(value interface{}) string {
 	}
 
 	return key
+}
+
+func GetSleepTime(i int64) time.Duration {
+	return time.Duration(i * 1)
 }

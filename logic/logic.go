@@ -32,7 +32,7 @@ func AutoGetRedisData() error {
 
 	//传入切片，拼接url参数发起请求，把数据存进redis
 	for i := 0; i < len(ss); i++ {
-		url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=%s", ss[i])
+		url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=300&symbol=%s", ss[i])
 		response, err := http.Get(url)
 		if err != nil {
 			log.Fatalf("get api fail err is %v", err)

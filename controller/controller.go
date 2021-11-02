@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"redisData/logic"
 )
 
 func Hello(c *gin.Context) {
@@ -29,20 +30,38 @@ func Test(c *gin.Context) {
 	c.DataFromReader(http.StatusOK, contentLength, contentType, reader, extraHeaders)
 }
 
-func AutoGetRedisData(c *gin.Context) {
-	//校验参数，不写直接给默认值
-
-	//逻辑处理 每30s发起请求 起10多个goroutine同时发起请求 通过数据拼接发起请求 拿到响应数据 存入redis同时发送到服务器
-
-	//返回数据
-}
+//func AutoGetRedisData(c *gin.Context) {
+//	//请求的 url https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt
+//	//校验参数，不写直接给默认值
+//
+//	//逻辑处理 每30s发起请求 起10多个goroutine同时发起请求 通过数据拼接发起请求 拿到响应数据 存入redis同时发送到服务器
+//
+//	//返回数据
+//}
 
 func GetRedisData(c *gin.Context) {
-	//请求的 url https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt
+
 	//校验参数，不写直接给默认值
+	symbol := c.Param("symbol")
+	if symbol == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"msg": "symbol param is require",
+		})
+		return
+	}
+	//判断key是否存在
 
-	//逻辑处理 每30s发起请求 起10多个goroutine同时发起请求 通过数据拼接发起请求 拿到响应数据 存入redis同时发送到服务器
-
+	//逻辑处理
+	data, err := logic.GetDataByKey(symbol)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"msg": err,
+		})
+		return
+	}
 	//返回数据
-}
+	c.JSON(http.StatusOK, gin.H{
+		"redisData": data,
+	})
 
+}

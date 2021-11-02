@@ -8,14 +8,14 @@ import (
 
 func main() {
 
+	//url := "127.0.0.1:8081/version"
+	response, err := http.Get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt")
 
-	url := "127.0.0.1:8081/version"
+	//req, err := http.NewRequest("GET", url, nil)
 
-	req, err := http.NewRequest("GET", url, nil)
+	//client := &http.Client{}
 
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
+	//resp, err := client.Do(req)
 
 	if err != nil {
 
@@ -23,15 +23,14 @@ func main() {
 
 	}
 
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
 	//fmt.Println("response Status:", resp.Status)
 
 	//fmt.Println("response Headers:", resp.Header)
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := ioutil.ReadAll(response.Body)
 
 	fmt.Println("response Body:", string(body))
-
 
 }

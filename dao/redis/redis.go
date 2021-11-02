@@ -17,7 +17,7 @@ func InitClient() (err error) {
 			viper.GetString("redis.host"),
 			viper.GetInt("redis.port")),
 		Password: viper.GetString("redis.password"), // no password set
-		DB:       viper.GetInt("redis.db"),       // use default DB
+		DB:       viper.GetInt("redis.db"),          // use default DB
 		PoolSize: viper.GetInt("redis.pool_size"),
 	})
 
@@ -28,4 +28,8 @@ func InitClient() (err error) {
 	//连接成功提示
 	fmt.Println("redis连接成功")
 	return nil
+}
+
+func Close() {
+	_ = rdb.Close()
 }

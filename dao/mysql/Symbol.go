@@ -12,6 +12,6 @@ func GetAllSymbol() (Symbols *[]model.Symbol, err error) {
 		fmt.Errorf("查询数据失败")
 		return nil, err
 	}
-	fmt.Printf("ss is %v", *ss)
+	//fmt.Printf("ss is %v", *ss)
 	return ss, nil
 }

@@ -14,7 +14,6 @@ import (
 //var symbol = make([]string, 0)
 
 //  QueryKlineData 每隔30s发送一次请求，请求全部类型的交易对
-//  如果没有key就创建，存在key就更新
 
 func QueryKlineData() {
 	//response, err := http.Get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt")
@@ -23,6 +22,7 @@ func QueryKlineData() {
 		return
 	}
 	time.AfterFunc(30*time.Second, QueryKlineData)
+	log.Println("开始获取交易对数据")
 }
 
 func main() {

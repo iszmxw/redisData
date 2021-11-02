@@ -7,7 +7,7 @@ start_time: "2021-11-01"
 machine_id: 1
 
 redis:
-  host: "127.0.0.1"
+  host: "10.10.10.200"
   port: 6379
   password: ""
   db: 0

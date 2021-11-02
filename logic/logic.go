@@ -27,8 +27,8 @@ func AutoGetRedisData() error {
 	for _, value := range *symbol {
 		ss = append(ss, value.Name)
 	}
-	fmt.Printf("ss is %v", ss)
-	fmt.Printf("ss is %T", ss)
+	//fmt.Printf("ss is %v", ss)
+	//fmt.Printf("ss is %T", ss)
 
 	//传入切片，拼接url参数发起请求，把数据存进redis
 	for i := 0; i < len(ss); i++ {

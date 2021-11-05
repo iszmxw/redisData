@@ -5,25 +5,13 @@ import (
 	"log"
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
-	"redisData/routes"
+	"redisData/huobi"
 	"redisData/setting"
 )
 
-//var symbol = make([]string, 0)
-
-//  QueryKlineData 每隔30s发送一次请求，请求全部类型的交易对
-
-//func QueryKlineData() {
-//	//response, err := http.Get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt")
-//	if err := logic.AutoGetRedisData(); err != nil {
-//		fmt.Printf("AutoGetRedisData is fail %v", err)
-//		return
-//	}
-//	time.AfterFunc(30*time.Second, QueryKlineData)
-//	log.Println("开始获取交易对数据")
-//}
-
 func main() {
+	symbol := "btcusdt"
+	period := "1min"
 	//初始化viper
 	if err := setting.Init(""); err != nil {
 		log.Println("viper init fail")
@@ -52,7 +40,5 @@ func main() {
 	//}
 	//go QueryKlineData()
 	fmt.Println("success")
-	//初始化routes
-	r := routes.SetUp()
-	r.Run(":8887")
+	huobi.NewSubscribe(symbol, period)
 }

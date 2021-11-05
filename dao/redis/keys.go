@@ -1,7 +1,7 @@
 package redis
 
 const (
-	Prefix             = "kline:"   // 项目key前缀
+	Prefix = "kline:" // 项目key前缀
 )
 
 // 给redis key加上前缀

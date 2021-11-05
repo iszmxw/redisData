@@ -16,6 +16,7 @@ var (
 func CreateOrChangeKline(key string, value interface{}) {
 	fullKey := getRedisKey(key)
 	err := rdb.Set(fullKey, value, 600*time.Second).Err()
+	log.Println("redis finish create or change")
 	log.Println(err)
 }
 
@@ -29,7 +30,7 @@ func GetKline(key string) (string, error) {
 		log.Printf("get name failed, err:%v\n", err)
 		return "", ErrorGetDataFail
 	} else {
-		log.Println("name", val)
+		//log.Println("name", val)
 		return val, nil
 	}
 }
@@ -41,4 +42,17 @@ func GetKline(key string) (string, error) {
 
 //根据key获取值
 
-//判断key是否存在
+// ExistKey 判断key是否存在
+func ExistKey(key string) bool {
+	result, err := rdb.Exists(key).Result()
+	if err != nil {
+		return true
+	}
+	if result == 1 {
+		return true
+	}
+	if result == 0 {
+		return false
+	}
+	return true
+}

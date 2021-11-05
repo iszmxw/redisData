@@ -15,3 +15,13 @@ func GetAllSymbol() (Symbols *[]model.Symbol, err error) {
 	//fmt.Printf("ss is %v", *ss)
 	return ss, nil
 }
+
+func GetDecimalScaleBySymbols(symbol string) (*model.DecimalScale, error) {
+	var d model.DecimalScale
+	sql := `select decimal_scale from osx_currency where k_line_code = ?`
+	if err := db.Get(&d, sql, symbol); err != nil {
+		fmt.Printf("get failed, err:%v\n", err)
+		return nil, err
+	}
+	return &d, nil
+}

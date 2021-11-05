@@ -9,14 +9,45 @@ import (
 	"net/http"
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
+	"redisData/huobi"
 )
 
 var (
 	ErrorUnmarshalFail = errors.New("UnmarshalFail")
 )
 
-func AutoGetRedisData() error {
+// main.go时，默认缓存16种symbol,1min的数据
 
+func StartSetRedisData(period string) error {
+	//通过访问mysql获取切片
+	symbol, err := mysql.GetAllSymbol()
+	if err != nil {
+		fmt.Printf("mysql.GetAllSymbol fail %v", err)
+		return err
+	}
+	ss := make([]string, 0, len(*symbol))
+	for _, value := range *symbol {
+		ss = append(ss, value.Name)
+	}
+	//根据symbol切片长度起goroutine
+	//1.遍历mysql中的symbol,NewSubscribe中有存入redis的方法
+	for i := 0; i < len(ss); i++ {
+		go huobi.NewSubscribe(ss[i], period)
+	}
+	return nil
+}
+
+func SubscribeOneKline(symbol string, period string) {
+	go huobi.NewSubscribe(symbol, period)
+}
+
+func AutoGetRedisData(size int64, period string) error {
+	if size == 0 {
+		size = 300
+	}
+	if period == "" {
+		period = "1min"
+	}
 	//通过访问mysql获取切片
 	symbol, err := mysql.GetAllSymbol()
 	if err != nil {
@@ -30,9 +61,11 @@ func AutoGetRedisData() error {
 	//fmt.Printf("ss is %v", ss)
 	//fmt.Printf("ss is %T", ss)
 
+	//把这部分修改成websocket
+
 	//传入切片，拼接url参数发起请求，把数据存进redis
 	for i := 0; i < len(ss); i++ {
-		url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=300&symbol=%s", ss[i])
+		url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=%s&size=%d&symbol=%s", period, size, ss[i])
 		response, err := http.Get(url)
 		if err != nil {
 			log.Fatalf("get api fail err is %v", err)
@@ -42,7 +75,9 @@ func AutoGetRedisData() error {
 		data := string(body)
 
 		//把数据写进redis
+		fmt.Println("redis开始写数据")
 		redis.CreateOrChangeKline(ss[i], data)
+		fmt.Println("redis结束写数据")
 
 	}
 

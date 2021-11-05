@@ -5,9 +5,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"net/http"
+	"redisData/dao/redis"
 	"redisData/logic"
 	"redisData/utils"
-	"strconv"
 	"time"
 )
 
@@ -19,6 +19,17 @@ var upGrader = websocket.Upgrader{
 	},
 }
 
+//func QueryKlineData(size int64,period string) {
+//	//response, err := http.Get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt")
+//
+//	if err := logic.AutoGetRedisData(size,period); err != nil {
+//		fmt.Printf("AutoGetRedisData is fail %v", err)
+//		return
+//	}
+//	time.AfterFunc(30*time.Second, QueryKlineData(size,period))
+//	log.Println("开始获取交易对数据")
+//}
+
 //func AutoGetRedisData(c *gin.Context) {
 //	//请求的 url https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt
 //	//校验参数，不写直接给默认值
@@ -29,6 +40,41 @@ var upGrader = websocket.Upgrader{
 //}
 
 func GetRedisData(c *gin.Context) {
+
+	//使用websocket后废弃
+	//------------------------------
+	//获取参数URL参数
+	//p := &model.WebSocketKlineParam{
+	//	Time:   1,
+	//	Period: "1min",
+	//}
+	//if err := c.ShouldBindQuery(p); err != nil {
+	//	fmt.Printf("ShouldBindQuery fail err:%v", err)
+	//	return
+	//}
+	//------------------------------
+
+	//把获取数据的逻辑放在这里,根据参数把数据存进redis 写入logic层
+	//通过websocket访问
+	if err := logic.StartSetRedisData(""); err != nil {
+		fmt.Printf("logic.StartSetRedisData() fail err:%v", err)
+	}
+
+	//通过http访问
+	//go func() {
+	//	for {
+	//		if err := logic.AutoGetRedisData(p.Size, p.Period); err != nil {
+	//			fmt.Printf("AutoGetRedisData is fail %v", err)
+	//			return
+	//		}
+	//		time.Sleep(30 * time.Second)
+	//	}
+	//
+	//}()
+
+	//ch := make(chan *model.ApiKlineParam)
+	//go QueryKlineData(ch)
+
 	//升级get请求为webSocket协议
 	ws, err := upGrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -41,25 +87,37 @@ func GetRedisData(c *gin.Context) {
 		if err != nil {
 			break
 		}
+		//对数据进行切割，读取参数
+		//如果请求的是market.ethbtc.kline.5min,订阅这条信息，然后再返回
+		strMsg := string(message)
+		//判断下key是否缓存过，否的话提交缓存
+		ret := redis.ExistKey(strMsg)
+		if ret != true {
+			resultList := utils.Split(strMsg, ".")
+			logic.SubscribeOneKline(resultList[1], resultList[3])
+		}
 		//自定义修改 1.获取参数 2.调用逻辑 3.返回数据
-		data, err := logic.GetDataByKey(string(message))
-		websocketData := utils.Strval(data)
+		//-------------------------------------------------------
+		//通过key获取数据后返回
+		//data, err := logic.GetDataByKey(strMsg)
+		//websocketData := utils.Strval(data)
+		//-------------------------------------------------------
 		//时间参数
-		times := c.Param("times")
-		t, err := strconv.Atoi(times)
-		tt := int64(t)
-		n := utils.GetSleepTime(tt)
+		//times := p.Time
+		//n := utils.GetSleepTime(times)
 		if err != nil {
 			fmt.Printf("字符串转换int类型失败,err is %v", err)
 		}
 		//写入ws数据
 		go func() {
 			for {
+				data, err := logic.GetDataByKey(strMsg)
+				websocketData := utils.Strval(data)
 				err = ws.WriteMessage(mt, []byte(websocketData))
 				if err != nil {
 					return
 				}
-				time.Sleep(time.Second * n)
+				time.Sleep(time.Second * 1)
 			}
 
 		}()

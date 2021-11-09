@@ -39,7 +39,7 @@ type Ticks struct {
 	Ts      int64       `json:"ts"`
 }
 
-// NewSubscribe 新订阅
+// NewSubscribe 新订阅 订阅K线图的
 func NewSubscribe(symbol string, period string) *market.Market {
 	//fmt.Printf("market.%s.kline.%s", symbol, period)
 	//参数校验
@@ -118,6 +118,7 @@ func NewSubscribe(symbol string, period string) *market.Market {
 
 }
 
+// NewQuotation 新订阅 订阅行情的
 func NewQuotation(symbol string) {
 	// 创建客户端实例
 	market, err := huobiapi.NewMarket()
@@ -179,5 +180,6 @@ func NewQuotation(symbol string) {
 		redis.CreateRedisData(fmt.Sprintf("\"%s\"", topic), string(jsonData))
 
 	})
+	market.Loop()
 
 }

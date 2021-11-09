@@ -18,8 +18,8 @@ var (
 	ErrorUnmarshalFail = errors.New("UnmarshalFail")
 )
 
-// StartSetRedisData main.go时，默认缓存16种symbol,1min的数据
-func StartSetRedisData(period string) error {
+// StartSetKlineData main.go时，默认缓存16种symbol,1min的数据
+func StartSetKlineData(period string) error {
 	//通过访问mysql获取切片
 	symbol, err := mysql.GetAllSymbol()
 	if err != nil {

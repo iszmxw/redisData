@@ -35,8 +35,8 @@ func GetKline(key string) (string, error) {
 	fullKey := getRedisKey(key)
 	val, err := rdb.Get(fullKey).Result()
 	if err == redis.Nil {
-		log.Println("name does not exist")
-		return "", ErrorRedisDataIsNull
+		log.Println("key does not exist")
+		return "", redis.Nil
 	} else if err != nil {
 		log.Printf("get name failed, err:%v\n", err)
 		return "", ErrorGetDataFail

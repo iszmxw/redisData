@@ -42,4 +42,6 @@ func main() {
 		recover()
 		http.Get("localhost:8887/start")
 	}()
+	//自动触发接口
+
 }

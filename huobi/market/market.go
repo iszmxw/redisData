@@ -14,7 +14,7 @@ import (
 /// 行情的Websocket入口
 var Endpoint = "wss://api.huobi.pro/ws"
 
-/// Websocket未连接错误
+/// Websocket 未连接错误
 var ConnectionClosedError = fmt.Errorf("websocket connection closed")
 
 type wsOperation struct {

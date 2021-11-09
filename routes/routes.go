@@ -15,6 +15,9 @@ func SetUp() *gin.Engine {
 	//查询，查询redis上的数据，返回给前端
 	//请求的 url https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt
 	r.GET("/getRedisData", controller.GetRedisData)
+	r.GET("/start", controller.StartController)
+	r.GET("/quotation", controller.QuotationController)
+	//r.GET("/getRedisData", controller.GetRedisData2)
 	//r.GET("/autoGetRedisData/:period/:size/:symbol", controller.AutoGetRedisData)
 	return r
 

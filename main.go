@@ -3,27 +3,15 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
 	"redisData/routes"
 	"redisData/setting"
 )
 
-//var symbol = make([]string, 0)
-
-//  QueryKlineData 每隔30s发送一次请求，请求全部类型的交易对
-
-//func QueryKlineData() {
-//	//response, err := http.Get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=btcusdt")
-//	if err := logic.AutoGetRedisData(); err != nil {
-//		fmt.Printf("AutoGetRedisData is fail %v", err)
-//		return
-//	}
-//	time.AfterFunc(30*time.Second, QueryKlineData)
-//	log.Println("开始获取交易对数据")
-//}
-
 func main() {
+
 	//初始化viper
 	if err := setting.Init(""); err != nil {
 		log.Println("viper init fail")
@@ -43,16 +31,15 @@ func main() {
 		return
 	}
 	defer redis.Close()
-	//起协程每隔30s请求一次并且缓存到redis
-	//var symbols = []string{"btcusdt"}
-	//go logic.AutoGetRedisData()
-	//if err := logic.AutoGetRedisData(); err != nil {
-	//	fmt.Printf("AutoGetRedisData is fail %v", err)
-	//	return
-	//}
-	//go QueryKlineData()
+
 	fmt.Println("success")
 	//初始化routes
 	r := routes.SetUp()
 	r.Run(":8887")
+
+	//宕机处理
+	defer func() {
+		recover()
+		http.Get("localhost:8887/start")
+	}()
 }

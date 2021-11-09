@@ -10,14 +10,15 @@ import (
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
 	"redisData/huobi"
+	"redisData/utils"
+	"strings"
 )
 
 var (
 	ErrorUnmarshalFail = errors.New("UnmarshalFail")
 )
 
-// main.go时，默认缓存16种symbol,1min的数据
-
+// StartSetRedisData main.go时，默认缓存16种symbol,1min的数据
 func StartSetRedisData(period string) error {
 	//通过访问mysql获取切片
 	symbol, err := mysql.GetAllSymbol()
@@ -37,10 +38,37 @@ func StartSetRedisData(period string) error {
 	return nil
 }
 
-func SubscribeOneKline(symbol string, period string) {
-	go huobi.NewSubscribe(symbol, period)
+// StartSetQuotation 自动获取行情数据
+func StartSetQuotation() error {
+	//通过访问mysql获取切片
+	symbol, err := mysql.GetAllSymbol()
+	if err != nil {
+		fmt.Printf("mysql.GetAllSymbol fail %v", err)
+		return err
+	}
+	ss := make([]string, 0, len(*symbol))
+	for _, value := range *symbol {
+		ss = append(ss, value.Name)
+	}
+	//根据symbol切片长度起goroutine
+	//1.遍历mysql中的symbol,NewQuotation中有存入redis的数据中
+	for i := 0; i < len(ss); i++ {
+		go huobi.NewQuotation(ss[i])
+	}
+	return nil
 }
 
+//SubscribeOneKline 客户端连接socket后，向服务端发送数据
+func SubscribeOneKline(symbol string, period string) {
+	go huobi.NewSubscribe(symbol, period)
+	//if <-ch != 1 {
+	//	market.Unsubscribe(fmt.Sprintf("market.%s.kline.%s", symbol, period))
+	//	market.Close()
+	//	return
+	//}
+}
+
+// AutoGetRedisData 通过HTTP请求自动存取symbol数据到redis
 func AutoGetRedisData(size int64, period string) error {
 	if size == 0 {
 		size = 300
@@ -114,4 +142,20 @@ func GetDataByKey(key string) (interface{}, error) {
 		return nil, ErrorUnmarshalFail
 	}
 	return i, nil
+}
+
+//CheckDataType 区分ping请求和订阅请求
+func CheckDataType(str string) (dataType int, str2 string) {
+	if strings.Contains(str, "ping") {
+		rest := utils.Split(str, ":")
+		str2 = rest[1]
+		return 1, str2
+	}
+	if strings.Contains(str, "pong") {
+		return 2, "success"
+	}
+	if strings.Contains(str, "kline") {
+		return 3, str
+	}
+	return 0, "other"
 }

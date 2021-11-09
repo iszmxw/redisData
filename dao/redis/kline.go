@@ -16,8 +16,19 @@ var (
 func CreateOrChangeKline(key string, value interface{}) {
 	fullKey := getRedisKey(key)
 	err := rdb.Set(fullKey, value, 600*time.Second).Err()
-	log.Println("redis finish create or change")
-	log.Println(err)
+	//log.Println("redis finish create or change")
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func CreateRedisData(key string, value interface{}) {
+	fullKey := getRedisKey(key)
+	err := rdb.Set(fullKey, value, 600*time.Second).Err()
+	//log.Println("redis finish create or change")
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func GetKline(key string) (string, error) {

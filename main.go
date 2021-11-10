@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
 	"redisData/routes"
@@ -40,7 +39,6 @@ func main() {
 	//宕机处理
 	defer func() {
 		recover()
-		http.Get("localhost:8887/start")
 	}()
 	//自动触发接口
 

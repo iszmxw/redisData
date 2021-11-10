@@ -19,7 +19,7 @@ var (
 )
 
 // StartSetKlineData main.go时，默认缓存16种symbol,1min的数据
-func StartSetKlineData(period string) error {
+func StartSetKlineData() error {
 	//通过访问mysql获取切片
 	symbol, err := mysql.GetAllSymbol()
 	if err != nil {
@@ -33,7 +33,7 @@ func StartSetKlineData(period string) error {
 	//根据symbol切片长度起goroutine
 	//1.遍历mysql中的symbol,NewSubscribe中有存入redis的方法
 	for i := 0; i < len(ss); i++ {
-		go huobi.NewSubscribe(ss[i], period)
+		go huobi.NewSubscribe(ss[i])
 	}
 	return nil
 }
@@ -60,7 +60,7 @@ func StartSetQuotation() error {
 
 //SubscribeOneKline 客户端连接socket后，向服务端发送数据
 func SubscribeOneKline(symbol string, period string) {
-	go huobi.NewSubscribe(symbol, period)
+	go huobi.NewSubscribe(symbol)
 	//if <-ch != 1 {
 	//	market.Unsubscribe(fmt.Sprintf("market.%s.kline.%s", symbol, period))
 	//	market.Close()

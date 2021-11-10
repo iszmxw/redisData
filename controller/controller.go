@@ -23,7 +23,7 @@ var upGrader = websocket.Upgrader{
 func StartController(c *gin.Context) {
 
 	//启动获取k线图数据
-	if err := logic.StartSetKlineData(""); err != nil {
+	if err := logic.StartSetKlineData(); err != nil {
 		fmt.Printf("logic.StartSetKlineData() fail err:%v", err)
 	}
 	//启动获取行情数据
@@ -44,6 +44,7 @@ func GetRedisData(c *gin.Context) {
 	ws, err := upGrader.Upgrade(c.Writer, c.Request, nil)
 
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	defer ws.Close() //返回前关闭
@@ -65,7 +66,7 @@ func GetRedisData(c *gin.Context) {
 				data, err := logic.GetDataByKey(strMsg)
 				//修改，当拿不到key重新订阅，10秒订阅一次
 				if err == redis.Nil {
-					logic.StartSetKlineData("")
+					logic.StartSetKlineData()
 					time.Sleep(10 * time.Second)
 				}
 				websocketData := utils.Strval(data)
@@ -87,6 +88,7 @@ func QuotationController(c *gin.Context) {
 	//升级get请求为webSocket协议
 	ws, err := upGrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	defer ws.Close() //返回前关闭

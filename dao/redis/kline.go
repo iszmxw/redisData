@@ -15,7 +15,8 @@ var (
 
 func CreateOrChangeKline(key string, value interface{}) {
 	fullKey := getRedisKey(key)
-	err := rdb.Set(fullKey, value, 600*time.Second).Err()
+	//修改过期时间为60s
+	err := rdb.Set(fullKey, value, 60*time.Second).Err()
 	//log.Println("redis finish create or change")
 	if err != nil {
 		log.Println(err)

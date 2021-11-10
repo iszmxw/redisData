@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/leizongmin/huobiapi"
-	"github.com/leizongmin/huobiapi/market"
 	"net/http"
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
@@ -40,12 +39,10 @@ type Ticks struct {
 }
 
 // NewSubscribe 新订阅 订阅K线图的
-func NewSubscribe(symbol string, period string) *market.Market {
+func NewSubscribe(symbol string) {
 	//fmt.Printf("market.%s.kline.%s", symbol, period)
 	//参数校验
-	if period == "" {
-		period = "1min"
-	}
+
 	// 创建客户端实例
 	market, err := huobiapi.NewMarket()
 	if err != nil {
@@ -58,7 +55,7 @@ func NewSubscribe(symbol string, period string) *market.Market {
 		}
 	}
 	// 订阅主题
-	market.Subscribe(fmt.Sprintf("market.%s.kline.%s", symbol, period), func(topic string, hjson *huobiapi.JSON) {
+	market.Subscribe(fmt.Sprintf("market.%s.kline.1min", symbol), func(topic string, hjson *huobiapi.JSON) {
 		// 收到数据更新时回调
 		//fmt.Println(topic, json)
 
@@ -114,7 +111,6 @@ func NewSubscribe(symbol string, period string) *market.Market {
 	//}
 
 	market.Loop()
-	return market
 
 }
 

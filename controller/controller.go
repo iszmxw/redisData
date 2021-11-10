@@ -119,7 +119,6 @@ func QuotationController(c *gin.Context) {
 				}
 				time.Sleep(time.Second * 1)
 			}
-
 		}()
 	}
 }

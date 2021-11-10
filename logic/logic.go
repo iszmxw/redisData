@@ -21,52 +21,55 @@ var (
 // StartSetKlineData main.go时，默认缓存16种symbol,1min的数据
 func StartSetKlineData() error {
 	//通过访问mysql获取切片
-	symbol, err := mysql.GetAllSymbol()
-	if err != nil {
-		fmt.Printf("mysql.GetAllSymbol fail %v", err)
-		return err
-	}
-	ss := make([]string, 0, len(*symbol))
-	for _, value := range *symbol {
-		ss = append(ss, value.Name)
-	}
+	//symbol, err := mysql.GetAllSymbol()
+	//if err != nil {
+	//	fmt.Printf("mysql.GetAllSymbol fail %v", err)
+	//	return err
+	//}
+	//ss := make([]string, 0, len(*symbol))
+	//for _, value := range *symbol {
+	//	ss = append(ss, value.Name)
+	//}
 	//根据symbol切片长度起goroutine
 	//1.遍历mysql中的symbol,NewSubscribe中有存入redis的方法
-	for i := 0; i < len(ss); i++ {
-		go huobi.NewSubscribe(ss[i])
-	}
+	//for i := 0; i < len(ss); i++ {
+	//	go huobi.NewSubscribe(ss[i])
+	//}
+	//return nil
+	go huobi.NewSubscribe()
 	return nil
 }
 
 // StartSetQuotation 自动获取行情数据
 func StartSetQuotation() error {
 	//通过访问mysql获取切片
-	symbol, err := mysql.GetAllSymbol()
-	if err != nil {
-		fmt.Printf("mysql.GetAllSymbol fail %v", err)
-		return err
-	}
-	ss := make([]string, 0, len(*symbol))
-	for _, value := range *symbol {
-		ss = append(ss, value.Name)
-	}
+	//symbol, err := mysql.GetAllSymbol()
+	//if err != nil {
+	//	fmt.Printf("mysql.GetAllSymbol fail %v", err)
+	//	return err
+	//}
+	//ss := make([]string, 0, len(*symbol))
+	//for _, value := range *symbol {
+	//	ss = append(ss, value.Name)
+	//}
 	//根据symbol切片长度起goroutine
 	//1.遍历mysql中的symbol,NewQuotation中有存入redis的数据中
-	for i := 0; i < len(ss); i++ {
-		go huobi.NewQuotation(ss[i])
-	}
+	//for i := 0; i < len(ss); i++ {
+	//	go huobi.NewQuotation(ss[i])
+	//}
+	go huobi.NewQuotation()
 	return nil
 }
 
 //SubscribeOneKline 客户端连接socket后，向服务端发送数据
-func SubscribeOneKline(symbol string, period string) {
-	go huobi.NewSubscribe(symbol)
-	//if <-ch != 1 {
-	//	market.Unsubscribe(fmt.Sprintf("market.%s.kline.%s", symbol, period))
-	//	market.Close()
-	//	return
-	//}
-}
+//func SubscribeOneKline(symbol string, period string) {
+//	go huobi.NewSubscribe(symbol)
+//	//if <-ch != 1 {
+//	//	market.Unsubscribe(fmt.Sprintf("market.%s.kline.%s", symbol, period))
+//	//	market.Close()
+//	//	return
+//	//}
+//}
 
 // AutoGetRedisData 通过HTTP请求自动存取symbol数据到redis
 func AutoGetRedisData(size int64, period string) error {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 	"log"
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
@@ -34,7 +35,7 @@ func main() {
 	fmt.Println("success")
 	//初始化routes
 	r := routes.SetUp()
-	r.Run(":8887")
+	r.Run(fmt.Sprintf(":%d",viper.GetInt("port")))
 
 	//宕机处理
 	defer func() {

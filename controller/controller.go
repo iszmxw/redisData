@@ -1,12 +1,14 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 	"github.com/gorilla/websocket"
 	"net/http"
 	"redisData/logic"
+	"redisData/model"
 	"redisData/utils"
 	"time"
 )
@@ -52,6 +54,7 @@ func GetRedisData(c *gin.Context) {
 		//读取ws中的数据
 		mt, message, err := ws.ReadMessage()
 		if err != nil {
+			fmt.Println(err)
 			break
 		}
 		//对数据进行切割，读取参数
@@ -66,12 +69,18 @@ func GetRedisData(c *gin.Context) {
 				data, err := logic.GetDataByKey(strMsg)
 				//修改，当拿不到key重新订阅，10秒订阅一次
 				if err == redis.Nil {
+					err = ws.WriteMessage(mt, []byte("key不存在，准备开始缓存"))
+					if err != nil {
+						return
+					}
 					logic.StartSetKlineData()
 					time.Sleep(10 * time.Second)
 				}
 				websocketData := utils.Strval(data)
 				err = ws.WriteMessage(mt, []byte(websocketData))
 				if err != nil {
+					fmt.Println(err)
+					ws.Close()
 					return
 				}
 				time.Sleep(time.Second * 2)
@@ -122,3 +131,117 @@ func QuotationController(c *gin.Context) {
 		}()
 	}
 }
+
+//https://api.huobi.pro/market/history/kline?period=1day&size=200&symbol=btcusdt
+
+// KlineHistoryController 每10秒缓存300条数据
+func KlineHistoryController(c *gin.Context)  {
+	//参数校验-无
+	//逻辑处理
+	err := logic.SetKlineHistory()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	//返回参数
+	c.JSON(http.StatusOK,gin.H{
+		"msg" : "保存K线图历史数据成功",
+	})
+
+}
+
+// GetKlineHistoryController 通过key获取历史300条数据
+func GetKlineHistoryController(c *gin.Context)  {
+	//参数检验
+	//校验参数，不写直接给默认值
+	symbol := c.Query("symbol")
+	period := c.Query("period")
+	fmt.Println(symbol)
+	if symbol == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"msg": "symbol param is require",
+		})
+		return
+	}
+	if symbol == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"msg": "period param is require",
+		})
+		return
+	}
+	//逻辑
+	//判断key是否存在，存在直接拿
+	key := fmt.Sprintf("\"market.%s.kline.%s\"", symbol, period)
+	res := logic.ExistKey(key)
+	if res == true{
+		fmt.Println("key已经存在")
+		//直接从reids查询返回
+		diy, err := logic.GetKlineHistoryDiy(symbol, period)
+		if err != nil {
+			fmt.Println(err)
+			return 
+		}
+		jsondata := utils.Strval(diy)
+		c.JSON(http.StatusOK,gin.H{
+			"data":jsondata,
+		})
+		return
+	}
+	//period != 1min,请求时再缓存
+	if period != "1min"{
+		fmt.Println("period != 1min")
+		//请求火币网，拿到数据换算，存进redis ,取redis
+		kilneData, err := logic.RequestHuobiKilne(symbol,period)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		//反序列化
+		var data model.KlineData
+		err = json.Unmarshal(kilneData, &data)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		//自有币换算
+		tranData := logic.TranDecimalScale(symbol,data)
+		//序列化
+		jsonData, err := json.Marshal(tranData)
+		if err != nil{
+			fmt.Println(jsonData)
+		}
+		//存进redis
+		logic.CreateHistoryKline(fmt.Sprintf("\"market.%s.kline.%s\"",symbol,period),string(jsonData))
+		//logic.GetKlineHistory(fmt.Sprintf("\"market.%s.kline.%s\"",symbol,period),string(tranData))
+		c.JSON(http.StatusOK,gin.H{
+			//返回数据
+			"data": tranData,
+		})
+
+
+	}
+
+	//period = 1min自动缓存
+	historyData, err := logic.GetKlineHistoryDiy(symbol,"")
+	//historyData, err := logic.GetKlineHistory(symbol)
+	if err != nil {
+		if err == redis.Nil {
+			err := logic.SetKlineHistory()
+			c.JSON(http.StatusOK,gin.H{
+				"msg" : "正在缓存数据,请2s后继续访问",
+
+			})
+			fmt.Println(err)
+			return
+
+			time.Sleep(10 * time.Second)
+		}
+		fmt.Println(err)
+		return
+	}
+	//返回数据
+	c.JSON(http.StatusOK,gin.H{
+		"data": historyData,
+	})
+}
+

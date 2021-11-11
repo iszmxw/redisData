@@ -10,8 +10,10 @@ import (
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
 	"redisData/huobi"
+	"redisData/model"
 	"redisData/utils"
 	"strings"
+	"time"
 )
 
 var (
@@ -61,74 +63,8 @@ func StartSetQuotation() error {
 	return nil
 }
 
-//SubscribeOneKline 客户端连接socket后，向服务端发送数据
-//func SubscribeOneKline(symbol string, period string) {
-//	go huobi.NewSubscribe(symbol)
-//	//if <-ch != 1 {
-//	//	market.Unsubscribe(fmt.Sprintf("market.%s.kline.%s", symbol, period))
-//	//	market.Close()
-//	//	return
-//	//}
-//}
-
-// AutoGetRedisData 通过HTTP请求自动存取symbol数据到redis
-func AutoGetRedisData(size int64, period string) error {
-	if size == 0 {
-		size = 300
-	}
-	if period == "" {
-		period = "1min"
-	}
-	//通过访问mysql获取切片
-	symbol, err := mysql.GetAllSymbol()
-	if err != nil {
-		fmt.Printf("mysql.GetAllSymbol fail %v", err)
-		return err
-	}
-	ss := make([]string, 0, len(*symbol))
-	for _, value := range *symbol {
-		ss = append(ss, value.Name)
-	}
-	//fmt.Printf("ss is %v", ss)
-	//fmt.Printf("ss is %T", ss)
-
-	//把这部分修改成websocket
-
-	//传入切片，拼接url参数发起请求，把数据存进redis
-	for i := 0; i < len(ss); i++ {
-		url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=%s&size=%d&symbol=%s", period, size, ss[i])
-		response, err := http.Get(url)
-		if err != nil {
-			log.Fatalf("get api fail err is %v", err)
-			return err
-		}
-		body, _ := ioutil.ReadAll(response.Body)
-		data := string(body)
-
-		//把数据写进redis
-		fmt.Println("redis开始写数据")
-		redis.CreateOrChangeKline(ss[i], data)
-		fmt.Println("redis结束写数据")
-
-	}
-
-	//for _, v := range ss {
-	//	url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=%s", v)
-	//	response, err := http.Get(url)
-	//	if err != nil {
-	//		log.Fatalf("get api fail err is %v", err)
-	//		return err
-	//	}
-	//	body, _ := ioutil.ReadAll(response.Body)
-	//	data := string(body)
-	//
-	//	//把数据写进redis
-	//	redis.CreateOrChangeKline(v, data)
-	//	return nil
-	//}
-	return nil
-
-}
+// key 是 kline:xxxx
+// GetDataByKey 获取key通过kline
 
 func GetDataByKey(key string) (interface{}, error) {
 	//根据key获取值
@@ -161,4 +97,179 @@ func CheckDataType(str string) (dataType int, str2 string) {
 		return 3, str
 	}
 	return 0, "other"
+}
+
+// SetKlineHistory 开始缓存k线图的历史数据
+func SetKlineHistory() error {
+
+	//通过访问mysql获取切片
+	symbol, err := mysql.GetAllSymbol()
+	if err != nil {
+		fmt.Printf("mysql.GetAllSymbol fail %v", err)
+		return err
+	}
+	ss := make([]string, 0, len(*symbol))
+	for _, value := range *symbol {
+		ss = append(ss, value.Name)
+	}
+	//fmt.Printf("ss is %v", ss)
+	//fmt.Printf("ss is %T", ss)
+
+	go func() {
+		//传入切片，拼接url参数发起请求，把数据存进redis
+		for i := 0; i < len(ss); i++ {
+			url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=300&symbol=%s", ss[i])
+			response, err := http.Get(url)
+			if err != nil {
+				log.Fatalf("get api fail err is %v", err)
+				return
+			}
+			body, _ := ioutil.ReadAll(response.Body)
+			//自由币换算
+			var kline model.KlineData
+			////序列化
+			err = json.Unmarshal(body, &kline)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			scale := TranDecimalScale(ss[i], kline)
+			////反序列化
+			d,_ := json.Marshal(scale)
+			data := string(d)
+
+			//把数据写进redis
+			//fmt.Println("redis开始写数据")
+			redis.CreateHistoryKline(fmt.Sprintf("\"market.%s.kline.1min\"",ss[i]),data)
+			//redis.CreateOrChangeKline(ss[i], data)
+			//fmt.Println("redis结束写数据")
+
+		}
+		time.Sleep(time.Second*30)
+	}()
+
+
+	//for _, v := range ss {
+	//	url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=%s", v)
+	//	response, err := http.Get(url)
+	//	if err != nil {
+	//		log.Fatalf("get api fail err is %v", err)
+	//		return err
+	//	}
+	//	body, _ := ioutil.ReadAll(response.Body)
+	//	data := string(body)
+	//
+	//	//把数据写进redis
+	//	redis.CreateOrChangeKline(v, data)
+	//	return nil
+	//}
+	return nil
+
+}
+
+// 新增HistoryKlineKey
+func CreateHistoryKline(key string,i interface{})  {
+	redis.CreateHistoryKline(key,i)
+}
+
+// GetKlineHistory 通过key获取历史300条k线图数据
+func GetKlineHistory(key string) (interface{}, error) {
+
+	//根据key获取值"market.btcusdt.kline.5min"
+	klineHistoryData, err := redis.GetKlineHistory(fmt.Sprintf("\"market.%s.kline.1min\"",key))
+	if err != nil {
+		return nil, err
+	}
+	//将对应key中的value值，将string转化成json后返回
+	data := []byte(klineHistoryData)
+	var i interface{}
+	//3.解析
+	if err := json.Unmarshal(data, &i); err != nil {
+		fmt.Println(err)
+		return nil, ErrorUnmarshalFail
+	}
+	return i, nil
+}
+
+//GetKlineHistory 获取300条k线数据，增加时间参数
+func GetKlineHistoryDiy(symbol string,period string) (interface{}, error){
+	if period == ""{
+		period = "1min"
+	}
+	//根据key获取值
+	klineHistoryData, err := redis.GetKlineHistory(fmt.Sprintf("\"market.%s.kline.%s\"",symbol,period))
+	if err != nil {
+		return nil, err
+	}
+	//将对应key中的value值，将string转化成json后返回
+	data := []byte(klineHistoryData)
+	var i interface{}
+	//3.解析
+	if err := json.Unmarshal(data, &i); err != nil {
+		fmt.Println(err)
+		return nil, ErrorUnmarshalFail
+	}
+	return i, nil
+}
+
+
+//RequestHuobiKilne 封装火币网请求K线图http请求  "market.btcusdt.kline.5min"
+func RequestHuobiKilne(symbol string, period string) ([]byte,error) {
+	url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=%s&size=300&symbol=%s", period,symbol)
+	response, err := http.Get(url)
+	if err != nil{
+		fmt.Println(err)
+		return nil,err
+	}
+	body, _ := ioutil.ReadAll(response.Body)
+	return body,nil
+}
+
+
+// TranDecimalScale 封装自由币换算
+func TranDecimalScale(symbol string,data model.KlineData) *model.KlineData {
+	//通过数据库得到 自有币位数
+	decimalscale, err := mysql.GetDecimalScaleBySymbols(symbol)
+	if err != nil {
+		fmt.Printf("mysql.GetDecimalScaleBySymbols fail err:%v", err)
+		return nil
+	}
+	//对数据和自有币位数进行运算，返回修改后的数据
+
+	for i := 0;i < len(data.Data);i++{
+		if decimalscale.Value > 0{
+			data.Data[i].Amount = data.Data[i].Amount * float64(decimalscale.Value) * 0.01
+			data.Data[i].Open = data.Data[i].Open * float64(decimalscale.Value) * 0.01
+			data.Data[i].Close = data.Data[i].Close * float64(decimalscale.Value) * 0.01
+			data.Data[i].Low = data.Data[i].Low * float64(decimalscale.Value) * 0.01
+			data.Data[i].High = data.Data[i].High * float64(decimalscale.Value) * 0.01
+			data.Data[i].Vol = data.Data[i].Vol * float64(decimalscale.Value) * 0.01
+		}
+		if decimalscale.Value < 0 {
+			decimalscale.Value = decimalscale.Value * -1
+			data.Data[i].Amount = data.Data[i].Amount / float64(decimalscale.Value) * 0.01
+			data.Data[i].Open = data.Data[i].Open / float64(decimalscale.Value) * 0.01
+			data.Data[i].Close = data.Data[i].Close / float64(decimalscale.Value) * 0.01
+			data.Data[i].Low = data.Data[i].Low / float64(decimalscale.Value) * 0.01
+			data.Data[i].High = data.Data[i].High / float64(decimalscale.Value) * 0.01
+			data.Data[i].Vol = data.Data[i].Vol / float64(decimalscale.Value) * 0.01
+		}
+
+		//序列化内部数据
+		//json.Marshal(&data.Data)
+		//if err != nil {
+		//	fmt.Println("是不是内部除了问题")
+		//	return nil
+		//}
+
+	}
+
+	return &data
+}
+
+
+//判断key是否已经缓存
+func ExistKey(key string)  bool {
+	existKey := redis.ExistKey(key)
+	return existKey
 }

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"errors"
+	"fmt"
 	"github.com/go-redis/redis"
 	"log"
 	"time"
@@ -31,6 +32,32 @@ func CreateRedisData(key string, value interface{}) {
 		log.Println(err)
 	}
 }
+
+func CreateHistoryKline(key string, value interface{})  {
+	fullKey := getHistoryKline(key)
+	err := rdb.Set(fullKey, value, 120*time.Second).Err()
+	//log.Println("redis finish create or change")
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func GetKlineHistory(key string) (string, error)  {
+	fullKey := getHistoryKline(key)
+	val, err := rdb.Get(fullKey).Result()
+	fmt.Println(fullKey)
+	if err == redis.Nil {
+		log.Println("key does not exist")
+		return "", redis.Nil
+	} else if err != nil {
+		log.Printf("get name failed, err:%v\n", err)
+		return "", ErrorGetDataFail
+	} else {
+		//log.Println("name", val)
+		return val, nil
+	}
+}
+
 
 func GetKline(key string) (string, error) {
 	fullKey := getRedisKey(key)

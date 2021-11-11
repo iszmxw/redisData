@@ -74,7 +74,7 @@ func GetRedisData(c *gin.Context) {
 				if err != nil {
 					return
 				}
-				time.Sleep(time.Second * 1)
+				time.Sleep(time.Second * 2)
 			}
 
 		}()

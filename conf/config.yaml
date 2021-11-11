@@ -9,7 +9,7 @@ redis:
   host: "10.10.10.200"
   port: 6379
   password: ""
-  db: 6
+  db: 5
   pool_size: 100
 
 
@@ -21,3 +21,19 @@ mysql:
   dbname: "osx"
   mysql_max_open_conns: 20
   mysql_max_idle_conns: 10
+
+#mysql:
+#  host: "192.168.175.128"
+#  port: 3308
+#  user: "root"
+#  password: "123456"
+#  dbname: "test"
+#  mysql_max_open_conns: 20
+#  mysql_max_idle_conns: 10
+#
+#redis:
+#  host: "127.0.0.1"
+#  port: 6379
+#  password: ""
+#  db: 6
+#  pool_size: 100

@@ -13,23 +13,23 @@ dataNum: 300
 #  pool_size: 100
 #
 #
-#mysql:
-#  host: "10.10.10.200"
-#  port: 3306
-#  user: "osx"
-#  password: "EYW5M7DECdhyX3d2"
-#  dbname: "osx"
-#  mysql_max_open_conns: 20
-#  mysql_max_idle_conns: 10
-
 mysql:
-  host: "192.168.175.128"
-  port: 3308
-  user: "root"
-  password: "123456"
-  dbname: "test"
+  host: "10.10.10.200"
+  port: 3306
+  user: "osx"
+  password: "EYW5M7DECdhyX3d2"
+  dbname: "osx"
   mysql_max_open_conns: 20
   mysql_max_idle_conns: 10
+
+#mysql:
+#  host: "192.168.175.128"
+#  port: 3308
+#  user: "root"
+#  password: "123456"
+#  dbname: "test"
+#  mysql_max_open_conns: 20
+#  mysql_max_idle_conns: 10
 
 redis:
   host: "127.0.0.1"

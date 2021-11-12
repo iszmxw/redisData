@@ -198,3 +198,79 @@ func NewQuotation() {
 	}
 	market.Loop()
 }
+
+
+func NewSubscribeParam(symbol string,period string){
+	// 创建客户端实例
+	market, err := huobiapi.NewMarket()
+	if err != nil {
+		fmt.Println(err)
+		err = market.ReConnect()
+		http.Get("localhost:8887/start")
+		if err != nil {
+			fmt.Println(err)
+			panic(err)
+		}
+	}
+	// 订阅主题
+	//使用循环一次订阅16条信息
+	//allSymbol, err := mysql.GetAllSymbol()
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+
+	market.Subscribe(fmt.Sprintf("market.%s.kline.%s", symbol,period), func(topic string, hjson *huobiapi.JSON) {
+		// 收到数据更新时回调
+		//fmt.Println(topic, json)
+
+		//redis.CreateOrChangeKline(topic, *json)
+		//fmt.Println(json)
+		//utils.JSONToMap(string(json.MarshalJSON()))
+		//jsonData是订阅后返回的信息 通过MarshalJSON将数据转化成String
+		jsonData, _ := hjson.MarshalJSON()
+		//mapData := utils.JSONToMap(string(jsonData))
+		subData := &SubData{}
+		if err := json.Unmarshal(jsonData, subData); err != nil {
+			fmt.Printf("json.Unmarshal subData fail err:%v", err)
+		}
+		//通过数据库得到 自有币位数
+		decimalscale, err := mysql.GetDecimalScaleBySymbols(symbol)
+		if err != nil {
+			fmt.Printf("mysql.GetDecimalScaleBySymbols fail err:%v", err)
+			return
+		}
+		//对数据和自有币位数进行运算，返回修改后的数据
+		if decimalscale.Value > 0 {
+			subData.Amount = subData.Amount * float64(decimalscale.Value) * 0.01
+			subData.Open = subData.Open * float64(decimalscale.Value) * 0.01
+			subData.Close = subData.Close * float64(decimalscale.Value) * 0.01
+			subData.Low = subData.Low * float64(decimalscale.Value) * 0.01
+			subData.High = subData.High * float64(decimalscale.Value) * 0.01
+			subData.Vol = subData.Vol * float64(decimalscale.Value) * 0.01
+		}
+		if decimalscale.Value < 0 {
+			decimalscale.Value = decimalscale.Value * -1
+			subData.Amount = subData.Amount / float64(decimalscale.Value) * 0.01
+			subData.Open = subData.Open / float64(decimalscale.Value) * 0.01
+			subData.Close = subData.Close / float64(decimalscale.Value) * 0.01
+			subData.Low = subData.Low / float64(decimalscale.Value) * 0.01
+			subData.High = subData.High / float64(decimalscale.Value) * 0.01
+			subData.Vol = subData.Vol / float64(decimalscale.Value) * 0.01
+		}
+		//取出ch当key
+		ch := subData.Ch
+		//把修改后的对象反序列化，存进redis
+		redisData, err := json.Marshal(subData)
+		if err != nil {
+			fmt.Printf("json.Marshal(subData) fail err:%v", err)
+		}
+		//根据推送返回的数据，以字符串的形式存入reids
+		//redis.CreateOrChangeKline(topic, string(redisData))
+		redis.CreateOrChangeKline(fmt.Sprintf("\"%s\"",ch), string(redisData))
+		//fmt.Println(string(redisData))
+
+	})
+
+	market.Loop()
+}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"redisData/dao/mysql"
 	"redisData/dao/redis"
+	abnormal "redisData/pkg"
 	"redisData/routes"
 	"redisData/setting"
 )
@@ -17,6 +18,7 @@ func main() {
 		log.Println("viper init fail")
 		return
 	}
+
 
 	//初始化MySQL
 	if err := mysql.InitMysql(); err != nil {
@@ -39,6 +41,7 @@ func main() {
 
 	//宕机处理
 	defer func() {
+		abnormal.Stack("panicError")
 		recover()
 	}()
 	//自动触发接口

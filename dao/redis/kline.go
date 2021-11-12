@@ -61,6 +61,7 @@ func GetKlineHistory(key string) (string, error)  {
 
 func GetKline(key string) (string, error) {
 	fullKey := getRedisKey(key)
+	//fmt.Println(fullKey)
 	val, err := rdb.Get(fullKey).Result()
 	if err == redis.Nil {
 		log.Println("key does not exist")

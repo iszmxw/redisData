@@ -117,35 +117,38 @@ func SetKlineHistory() error {
 
 	go func() {
 		//传入切片，拼接url参数发起请求，把数据存进redis
-		for i := 0; i < len(ss); i++ {
-			url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=300&symbol=%s", ss[i])
-			response, err := http.Get(url)
-			if err != nil {
-				log.Fatalf("get api fail err is %v", err)
-				return
-			}
-			body, _ := ioutil.ReadAll(response.Body)
-			//自由币换算
-			var kline model.KlineData
-			////序列化
-			err = json.Unmarshal(body, &kline)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			scale := TranDecimalScale(ss[i], kline)
-			////反序列化
-			d,_ := json.Marshal(scale)
-			data := string(d)
+		for  {
+			for i := 0; i < len(ss); i++ {
+				url := fmt.Sprintf("https://api.huobi.pro/market/history/kline?period=1min&size=300&symbol=%s", ss[i])
+				response, err := http.Get(url)
+				if err != nil {
+					log.Fatalf("get api fail err is %v", err)
+					return
+				}
+				body, _ := ioutil.ReadAll(response.Body)
+				//自由币换算
+				var kline model.KlineData
+				////序列化
+				err = json.Unmarshal(body, &kline)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				scale := TranDecimalScale(ss[i], kline)
+				////反序列化
+				d,_ := json.Marshal(scale)
+				data := string(d)
 
-			//把数据写进redis
-			//fmt.Println("redis开始写数据")
-			redis.CreateHistoryKline(fmt.Sprintf("\"market.%s.kline.1min\"",ss[i]),data)
-			//redis.CreateOrChangeKline(ss[i], data)
-			//fmt.Println("redis结束写数据")
+				//把数据写进redis
+				//fmt.Println("redis开始写数据")
+				redis.CreateHistoryKline(fmt.Sprintf("\"market.%s.kline.1min\"",ss[i]),data)
+				//redis.CreateOrChangeKline(ss[i], data)
+				//fmt.Println("redis结束写数据")
 
+			}
+			time.Sleep(time.Second*30)
 		}
-		time.Sleep(time.Second*30)
+
 	}()
 
 

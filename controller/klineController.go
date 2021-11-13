@@ -1,249 +1,190 @@
+
 package controller
+
 import (
-"errors"
+	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"log"
-"net/http"
+	"github.com/go-redis/redis"
+	"github.com/gorilla/websocket"
+	"github.com/leizongmin/huobiapi"
+	"net/http"
+	"redisData/huobi"
 	"redisData/logic"
+	"redisData/model"
 	"redisData/utils"
+	"strings"
 	"sync"
-"time"
-
-"github.com/gorilla/websocket"
+	"time"
 )
 
-const (
-	// 允许等待的写入时间
-	writeWait = 10 * time.Second
+//声明一个线程安全的map,存放ws和user
+var users sync.Map
 
-	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
 
-	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
-
-	// Maximum message size allowed from peer.
-	maxMessageSize = 512
-)
-
-// 最大的连接ID，每次连接都加1 处理
-var maxConnId int64
-
-// 客户端读写消息
-type wsMessage struct {
-	// websocket.TextMessage 消息类型
-	messageType int
-	data        []byte
-}
-
-// ws 的所有连接
-// 用于广播
-var wsConnAll map[int64]*wsConnection
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	// 允许所有的CORS 跨域请求，正式环境可以关闭
+//设置websocket
+//CheckOrigin防止跨站点的请求伪造
+var upGrader1 = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
 
-// 客户端连接
-type wsConnection struct {
-	wsSocket *websocket.Conn // 底层websocket
-	inChan   chan *wsMessage // 读队列
-	outChan  chan *wsMessage // 写队列
-
-	mutex     sync.Mutex // 避免重复关闭管道,加锁处理
-	isClosed  bool
-	closeChan chan byte // 关闭通知
-	id        int64
+// WsConn1 声明并发安全的ws
+type WsConn1 struct {
+	*websocket.Conn
+	Mux sync.RWMutex
 }
 
-func wsHandler(resp http.ResponseWriter, req *http.Request) {
-	// 应答客户端告知升级连接为websocket
-	wsSocket, err := upgrader.Upgrade(resp, req, nil)
-	if err != nil {
-		log.Println("升级为websocket失败", err.Error())
+// UserInfo 看这个用户订阅了什么
+type UserInfo struct {
+	Uid     string `json:"uid"`
+	Sub    []string `json:"sub_topic"`
+}
+
+func GetRedisData2(c *gin.Context)  {
+	//每个用户连接,就new一个 ws
+	ws, err := upGrader.Upgrade(c.Writer, c.Request, nil)
+	if err !=nil{
+		fmt.Printf("upGrader.Upgrade err%v",err)
 		return
 	}
-	maxConnId++
-	// TODO 如果要控制连接数可以计算，wsConnAll长度
-	// 连接数保持一定数量，超过的部分不提供服务
-	wsConn := &wsConnection{
-		wsSocket:  wsSocket,
-		inChan:    make(chan *wsMessage, 1000),
-		outChan:   make(chan *wsMessage, 1000),
-		closeChan: make(chan byte),
-		isClosed:  false,
-		id:        maxConnId,
+	defer ws.Close() //返回前关闭
+	var user UserInfo
+	user.Uid = utils.GetGenerateId()
+	wsConn := &WsConn{
+		ws,
+		sync.RWMutex{},
 	}
-	wsConnAll[maxConnId] = wsConn
-	log.Println("当前在线人数", len(wsConnAll))
 
-	// 处理器,发送定时信息，避免意外关闭
-	go wsConn.processLoop()
-	// 读协程
-	go wsConn.wsReadLoop()
-	// 写协程
-	go wsConn.wsWriteLoop()
-}
-
-// 处理队列中的消息
-func (wsConn *wsConnection) processLoop() {
-	// 处理消息队列中的消息
-	// 获取到消息队列中的消息，处理完成后，发送消息给客户端
-	for {
-		msg, err := wsConn.wsRead()
-		if err != nil {
-			log.Println("获取消息出现错误", err.Error())
-			break
-		}
-		log.Println("接收到消息", string(msg.data))
-		// 修改以下内容把客户端传递的消息传递给处理程序
-		err = wsConn.wsWrite(msg.messageType, msg.data)
-		if err != nil {
-			log.Println("发送消息给客户端出现错误", err.Error())
-			break
-		}
-	}
-}
-
-// 处理消息队列中的消息
-func (wsConn *wsConnection) wsReadLoop() {
-	// 设置消息的最大长度
-	wsConn.wsSocket.SetReadLimit(maxMessageSize)
-	wsConn.wsSocket.SetReadDeadline(time.Now().Add(pongWait))
-	for {
-		// 读一个message
-		msgType, data, err := wsConn.wsSocket.ReadMessage()
-		//读取信息，去redis查询对应的key
-		strData, err := logic.GetDataByKey(string(data))
-		jsondata := utils.Strval(strData)
-		if err != nil {
-			return
-		}
-		if err != nil {
-			websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure)
-			log.Println("消息读取出现错误", err.Error())
-			wsConn.close()
-			return
-		}
-		req := &wsMessage{
-			msgType,
-			[]byte(jsondata),
-		}
-		// 放入请求队列,消息入栈
-		select {
-		case wsConn.inChan <- req:
-		case <-wsConn.closeChan:
-			return
-		}
-	}
-}
-
-// 发送消息给客户端
-func (wsConn *wsConnection) wsWriteLoop() {
-	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-	}()
-	for {
-		select {
-		// 取一个应答
-		case msg := <-wsConn.outChan:
-			// 写给websocket
-			if err := wsConn.wsSocket.WriteMessage(msg.messageType, msg.data); err != nil {
-				log.Println("发送消息给客户端发生错误", err.Error())
-				// 切断服务
-				wsConn.close()
-				return
-			}
-		case <-wsConn.closeChan:
-			// 获取到关闭通知
-			return
-		case <-ticker.C:
-			// 出现超时情况
-			wsConn.wsSocket.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := wsConn.wsSocket.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
-	}
-}
-
-// 写入消息到队列中
-func (wsConn *wsConnection) wsWrite(messageType int, data []byte) error {
-	select {
-	case wsConn.outChan <- &wsMessage{messageType, data}:
-	case <-wsConn.closeChan:
-		return errors.New("连接已经关闭")
-	}
-	return nil
-}
-
-// 读取消息队列中的消息
-func (wsConn *wsConnection) wsRead() (*wsMessage, error) {
-	select {
-	case msg := <-wsConn.inChan:
-		// 获取到消息队列中的消息
-		return msg, nil
-	case <-wsConn.closeChan:
-
-	}
-	return nil, errors.New("连接已经关闭")
-}
-
-// 关闭连接
-func (wsConn *wsConnection) close() {
-	log.Println("关闭连接被调用了")
-	wsConn.wsSocket.Close()
-	wsConn.mutex.Lock()
-	defer wsConn.mutex.Unlock()
-	if wsConn.isClosed == false {
-		wsConn.isClosed = true
-		// 删除这个连接的变量
-		delete(wsConnAll, wsConn.id)
-		close(wsConn.closeChan)
-	}
-}
-
-func GetRedisData2(c *gin.Context) {
-	//升级该请求为websocket请求
-	// 应答客户端告知升级连接为websocket
-	wsSocket, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	//每一个ws 对应一个market
+	//连接一个market
+	market, err := huobi.NewMarket()
 	if err != nil {
-		log.Println("升级为websocket失败", err.Error())
-		return
+		fmt.Printf("huobi.NewMarket() fail %v",err)
 	}
-	//maxConnId++
-	// TODO 如果要控制连接数可以计算，wsConnAll长度
-	// 连接数保持一定数量，超过的部分不提供服务
-	wsConn := &wsConnection{
-		wsSocket:  wsSocket,
-		inChan:    make(chan *wsMessage, 1000),
-		outChan:   make(chan *wsMessage, 1000),
-		closeChan: make(chan byte),
-		isClosed:  false,
-		id:        maxConnId,
-	}
-	wsConnAll[maxConnId] = wsConn
-	log.Println("当前在线人数", len(wsConnAll))
+	//把这个websocket指针和user对应的hash储存起来
+	users.Store(ws,user)
 
-	// 处理器,发送定时信息，避免意外关闭
-	go wsConn.processLoop()
-	// 读协程
-	go wsConn.wsReadLoop()
-	// 写协程
-	go wsConn.wsWriteLoop()
+	//读取客户端信息
+	for {
+		//读取ws中的数据
+		wsConn.Mux.Lock()
+		mt, message, err := wsConn.Conn.ReadMessage()
+		wsConn.Mux.Unlock()
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		//把用户传进来的消息进行处理 msg样式 "market.btcusdt.kline.1min"
+		msg := string(message)
+		//-------------
+		fmt.Println(msg)
+		//当请求数据中含有1min或1step这些为已经缓存数据,直接去redis拿
+		if strings.Contains(msg,"1min")||strings.Contains(msg,"step1"){
+			go func() {
+				for  {
+					data, err := logic.GetDataByKey(msg)
+					if err !=nil{
+						//如果redis数据获取或者start接口没有被调用，就要重新缓存
+						if err == redis.Nil{
+							wsConn.Mux.Lock()
+							err = wsConn.Conn.WriteMessage(mt, []byte("数据已过期，准备开始缓存"))
+							wsConn.Mux.Unlock()
+							if err != nil {
+								fmt.Printf("wsConn.Conn.WriteMessage fail %v",err)
+								return
+							}
+							fmt.Printf("logic.GetDataByKey fail %v",err)
+							//5s 订阅一次，避免newMarket报错
+							//订阅k线图的数据
+							err := logic.StartSetKlineData()
+							if err != nil {
+								fmt.Printf("logic.StartSetKlineData fail err%v",err)
+								return
+							}
+							time.Sleep(2*time.Second)
+							//订阅行情的数据
+							err = logic.StartSetQuotation()
+							if err != nil {
+								fmt.Printf("logic.StartSetQuotation fail err%v",err)
+								return
+							}
+							time.Sleep(10 * time.Second)
+						}
+					}
+					//把读到数据，序列化后返回
+					websocketData := utils.Strval(data)
+					wsConn.Mux.Lock()
+					err = wsConn.Conn.WriteMessage(mt, []byte(websocketData))
+					wsConn.Mux.Unlock()
+					if err != nil {
+						fmt.Println(err)
+						ws.Close()
+
+					}
+					//每2s推送一次
+					time.Sleep(time.Second * 2)
+				}
+			}()
+			return
+		}
+//第二部分逻辑  输入参数为"market.btcusdt.kline.5min" ，等数据库不存在的数据，直接转发60秒后取消订阅，刷新后重新订阅（先不做看性能如何）
+		//如果请求的是market.ethbtc.kline.5min,订阅这条信息，然后再返回
+		//msg 用户输入的数据byte转string
+		//直接拿msg去订阅
+		market.Subscribe(msg, func(topic string, hjson *huobiapi.JSON) {
+			// 收到数据更新时回调
+			fmt.Println(topic, hjson)
+			jsondata, err := hjson.MarshalJSON()
+			if err != nil {
+				fmt.Printf("hjson.MarshalJSON fail err%v",err)
+				return
+			}
+			//把jsondata反序列化后进行，自由币判断运算
+			klineData := model.KlineData{}
+			err = json.Unmarshal(jsondata, &klineData)
+			if err != nil {
+				fmt.Printf("json.Unmarshal %v",err)
+				return
+			}
+			//自由币换算
+			tranData := logic.TranDecimalScale2(msg,klineData)
+			//结构体序列化后返回
+			data, err := json.Marshal(tranData)
+			if err != nil {
+				fmt.Printf("json.Marshal(tranData) fail %v",err)
+				return
+			}
+			//返回数据给用户
+			wsConn.Mux.Lock()
+			err = wsConn.Conn.WriteMessage(mt, data)
+			wsConn.Mux.Unlock()
+			if err != nil {
+				fmt.Println(err)
+				ws.Close()
+
+			}
+
+		})
+
+
+	}
+	//关闭前处理下订阅信息
+	//定义回调函数
+	h := func(code int,text string ) error {
+		//最好加一个取消订阅
+		err := market.Close()
+		if err != nil {
+			fmt.Printf("market.Close() fail %v",err)
+		}
+		return nil
+	}
+	ws.SetCloseHandler(h)
+
+
+
+
 }
 
-
-
-//启动程序
-func StartWebsocket(addrPort string) {
-	wsConnAll = make(map[int64]*wsConnection)
-	http.HandleFunc("/ws", wsHandler)
-	http.ListenAndServe(addrPort, nil)
-}

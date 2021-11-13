@@ -53,7 +53,7 @@ func NewSubscribe() {
 	market, err := huobiapi.NewMarket()
 	if err != nil {
 		fmt.Println(err)
-		err = market.ReConnect()
+		//err = market.ReConnect()
 		http.Get("localhost:8887/start")
 		if err != nil {
 			fmt.Println(err)

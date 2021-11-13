@@ -135,6 +135,8 @@ func GetRedisData4(c *gin.Context) {
 	for {
 		//读取ws中的数据
 		mt, message, err := wsConn.Conn.ReadMessage()
+		//打印参数
+		fmt.Println(string(message))
 		if err != nil {
 			fmt.Println(err)
 			break
@@ -325,9 +327,8 @@ func GetKlineHistoryController(c *gin.Context)  {
 			return 
 		}
 		jsondata := utils.Strval(diy)
-		c.JSON(http.StatusOK,gin.H{
-			"data":jsondata,
-		})
+
+		c.JSON(http.StatusOK,jsondata)
 		return
 	}
 	//period != 1min,请求时再缓存
